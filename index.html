@@ -46,4 +46,237 @@ function exportData(){let blob=new Blob([JSON.stringify({version:1,exportedAt:ne
 async function importData(e){let file=e.target.files[0];if(!file)return;try{let obj=JSON.parse(await file.text()),v=obj.data||obj;if(!['gym','bike','money','trade'].every(k=>Array.isArray(v[k])))throw Error('Format incorrecte');if(confirm('Substituir totes les dades actuals per les de la còpia?')){db=v;save();render()}}catch(err){alert('No es pot importar el fitxer: '+err.message)}}
 function render(){app().innerHTML=tab==='home'?home():tab==='sport'?sport():tab==='money'?money():tab==='trade'?trading():settings();if(tab==='sport'&&sub==='gym')drawGymChart()}
 $('#today').textContent=new Date().toLocaleDateString('ca-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});render();
+
+// MY LIFE - Rutines de gimnàs
+const originalSport = sport;
+if (!Array.isArray(db.routines)) db.routines = [];
+if (!Array.isArray(db.workouts)) db.workouts = [];
+let gymView = 'routines';
+let selectedRoutine = null;
+let activeWorkout = null;
+
+function routineById(uid) {
+  return db.routines.find(r => r.id === uid);
+}
+
+function newRoutine() {
+  const name = prompt('Nom de la rutina (ex. Pit i tríceps):');
+  if (!name || !name.trim()) return;
+  const r = {id:id(),name:name.trim(),exercises:[]};
+  db.routines.push(r);
+  save();
+  selectedRoutine = r.id;
+  gymView = 'edit';
+  render();
+}
+
+function addRoutineExercise() {
+  const r = routineById(selectedRoutine);
+  if (!r) return;
+  const name = prompt('Nom de l’exercici:');
+  if (!name || !name.trim()) return;
+  r.exercises.push({
+    id:id(),name:name.trim(),
+    sets:[
+      {kg:0,reps:10},
+      {kg:0,reps:10},
+      {kg:0,reps:10}
+    ]
+  });
+  save();render();
+}
+
+function addRoutineSet(eid) {
+  const r = routineById(selectedRoutine);
+  const e = r?.exercises.find(x=>x.id===eid);
+  if (!e) return;
+  const last = e.sets[e.sets.length-1] || {kg:0,reps:10};
+  e.sets.push({...last});
+  save();render();
+}
+
+function editRoutineSet(eid,i,field,value) {
+  const e = routineById(selectedRoutine)?.exercises.find(x=>x.id===eid);
+  if (!e || !e.sets[i]) return;
+  e.sets[i][field] = Math.max(0,Number(value)||0);
+  save();
+}
+
+function deleteRoutineExercise(eid) {
+  if (!confirm('Eliminar aquest exercici de la rutina?')) return;
+  routineById(selectedRoutine).exercises =
+    routineById(selectedRoutine).exercises.filter(e=>e.id!==eid);
+  save();render();
+}
+
+function startWorkout() {
+  const r = routineById(selectedRoutine);
+  if (!r || !r.exercises.length) {
+    alert('Primer afegeix exercicis a la rutina.');
+    return;
+  }
+  const previous = db.workouts.filter(w=>w.routineId===r.id).at(-1);
+  activeWorkout = {
+    id:id(),routineId:r.id,name:r.name,
+    started:Date.now(),
+    exercises:r.exercises.map(e=>{
+      const old = previous?.exercises.find(x=>x.name===e.name);
+      return {
+        name:e.name,
+        sets:(old?.sets||e.sets).map(s=>({
+          kg:s.kg,reps:s.reps,done:false
+        }))
+      };
+    })
+  };
+  gymView='session';
+  render();
+}
+
+function markWorkoutSet(ei,si,checked) {
+  activeWorkout.exercises[ei].sets[si].done=checked;
+  render();
+}
+
+function editWorkoutSet(ei,si,field,value) {
+  activeWorkout.exercises[ei].sets[si][field]=
+    Math.max(0,Number(value)||0);
+}
+
+function addWorkoutSet(ei) {
+  const sets=activeWorkout.exercises[ei].sets;
+  const last=sets[sets.length-1]||{kg:0,reps:10};
+  sets.push({kg:last.kg,reps:last.reps,done:false});
+  render();
+}
+
+function finishWorkout() {
+  if (!confirm('Finalitzar i guardar l’entrenament?')) return;
+  const w=activeWorkout;
+  w.ended=Date.now();
+  w.date=new Date(w.started).toLocaleDateString('sv-SE');
+  db.workouts.push(w);
+  // Les sèries completades també apareixeran als resums antics.
+  w.exercises.forEach(e=>e.sets.forEach((s,i)=>{
+    if(s.done) db.gym.push({
+      id:id(),date:w.date,exercise:e.name,
+      set:i+1,kg:s.kg,reps:s.reps
+    });
+  }));
+  save();
+  activeWorkout=null;
+  gymView='history';
+  render();
+}
+
+function workoutTime(ms) {
+  const seconds=Math.max(0,Math.floor(ms/1000));
+  return String(Math.floor(seconds/3600)).padStart(2,'0')+':'+
+    String(Math.floor(seconds%3600/60)).padStart(2,'0')+':'+
+    String(seconds%60).padStart(2,'0');
+}
+
+function gymRoutines() {
+  let html=`<h2 style="margin-top:24px">Les meves rutines</h2>
+  <button class="primary" onclick="newRoutine()">+ Crear rutina</button>`;
+  db.routines.forEach(r=>{
+    html+=`<div class="card">
+      <h3>${esc(r.name)}</h3>
+      <p class="muted">${r.exercises.length} exercicis</p>
+      <div class="actions">
+      <button class="primary" onclick="selectedRoutine='${r.id}';startWorkout()">▶ Entrenar</button>
+      <button class="secondary" onclick="selectedRoutine='${r.id}';gymView='edit';render()">Editar</button>
+      </div></div>`;
+  });
+  return html||emptyMsg();
+}
+
+function gymEditor() {
+  const r=routineById(selectedRoutine);
+  if(!r)return gymRoutines();
+  let html=`<button class="secondary" onclick="gymView='routines';render()">← Rutines</button>
+  <h2 style="margin-top:20px">${esc(r.name)}</h2>`;
+  r.exercises.forEach(e=>{
+    html+=`<div class="card"><h3>${esc(e.name)}</h3>`;
+    e.sets.forEach((s,i)=>{
+      html+=`<div class="formgrid">
+        <div><label>Sèrie ${i+1} · kg</label>
+        <input type="number" min="0" step="any" value="${s.kg}"
+        onchange="editRoutineSet('${e.id}',${i},'kg',this.value)"></div>
+        <div><label>Repeticions</label>
+        <input type="number" min="0" value="${s.reps}"
+        onchange="editRoutineSet('${e.id}',${i},'reps',this.value)"></div>
+      </div>`;
+    });
+    html+=`<div class="actions">
+    <button class="secondary" onclick="addRoutineSet('${e.id}')">+ Sèrie</button>
+    <button class="secondary dangerbtn" onclick="deleteRoutineExercise('${e.id}')">Eliminar exercici</button>
+    </div></div>`;
+  });
+  return html+`<div class="actions">
+    <button class="secondary" onclick="addRoutineExercise()">+ Exercici</button>
+    <button class="primary" onclick="startWorkout()">▶ Començar entrenament</button>
+  </div>`;
+}
+
+function gymSession() {
+  const w=activeWorkout;
+  if(!w)return gymRoutines();
+  let html=`<h2 style="margin-top:24px">${esc(w.name)}</h2>
+  <div class="card"><div class="muted">Temps d'entrenament</div>
+  <div class="metric accent" id="workoutClock">${workoutTime(Date.now()-w.started)}</div></div>`;
+  w.exercises.forEach((e,ei)=>{
+    html+=`<div class="card"><h3>${esc(e.name)}</h3>`;
+    e.sets.forEach((s,si)=>{
+      html+=`<div class="formgrid" style="align-items:end">
+        <div><label>Sèrie ${si+1} · kg</label>
+        <input type="number" min="0" step="any" value="${s.kg}"
+        onchange="editWorkoutSet(${ei},${si},'kg',this.value)"></div>
+        <div><label>Repeticions</label>
+        <input type="number" min="0" value="${s.reps}"
+        onchange="editWorkoutSet(${ei},${si},'reps',this.value)"></div>
+        <div class="full" style="margin:10px 0">
+        <label style="font-size:15px">
+        <input type="checkbox" style="width:auto" ${s.done?'checked':''}
+        onchange="markWorkoutSet(${ei},${si},this.checked)">
+        ${s.done?'✓ Sèrie completada':'Marcar sèrie completada'}
+        </label></div></div>`;
+    });
+    html+=`<button class="secondary small" onclick="addWorkoutSet(${ei})">+ Sèrie</button></div>`;
+  });
+  return html+`<button class="primary" onclick="finishWorkout()">✓ Finalitzar entrenament</button>`;
+}
+
+function gymHistory() {
+  let html=`<h2 style="margin-top:24px">Historial d'entrenaments</h2>`;
+  db.workouts.slice().reverse().forEach(w=>{
+    const count=w.exercises.reduce((n,e)=>n+e.sets.filter(s=>s.done).length,0);
+    html+=`<div class="card"><h3>${esc(w.name)}</h3>
+    <p class="muted">${esc(w.date)} · ${workoutTime(w.ended-w.started)} · ${count} sèries completades</p>
+    ${w.exercises.map(e=>`<p class="muted"><strong>${esc(e.name)}</strong>: ${
+      e.sets.filter(s=>s.done).map(s=>`${num(s.kg)} kg × ${num(s.reps)}`).join(' · ')||'Sense sèries'
+    }</p>`).join('')}</div>`;
+  });
+  return html;
+}
+
+sport=function(){
+  if(sub!=='gym')return originalSport();
+  return `<h2 style="margin-top:24px">Esport</h2>
+  ${buttons([['gym','Gimnàs'],['bike','Bici'],['summary','Resums']],sub,'setSub')}
+  ${buttons([['routines','Rutines'],['history','Historial'],['old','Registres antics']],gymView,'setGymView')}
+  ${gymView==='routines'?gymRoutines():
+    gymView==='edit'?gymEditor():
+    gymView==='session'?gymSession():
+    gymView==='history'?gymHistory():originalSport()}`;
+};
+
+function setGymView(v){gymView=v;render()}
+setInterval(()=>{
+  if(activeWorkout){
+    const clock=document.getElementById('workoutClock');
+    if(clock)clock.textContent=workoutTime(Date.now()-activeWorkout.started);
+  }
+},1000);
+
 </script></body></html>
