@@ -279,4 +279,76 @@ setInterval(()=>{
   }
 },1000);
 
+// MY LIFE - Eliminar rutines i sèries
+
+function deleteRoutine(uid) {
+  if (activeWorkout) {
+    alert('Finalitza primer l’entrenament actiu.');
+    return;
+  }
+  const r = routineById(uid);
+  if (!r || !confirm('Vols eliminar la rutina "' + r.name + '"? Els entrenaments anteriors es conservaran.')) return;
+  db.routines = db.routines.filter(x => x.id !== uid);
+  if (selectedRoutine === uid) selectedRoutine = null;
+  gymView = 'routines';
+  save();
+  render();
+}
+
+function deleteRoutineSet(eid, index) {
+  const r = routineById(selectedRoutine);
+  const e = r?.exercises.find(x => x.id === eid);
+  if (!e) return;
+  e.sets.splice(index, 1);
+  save();
+  render();
+}
+
+function deleteWorkoutSet(ei, si) {
+  if (!activeWorkout?.exercises[ei]) return;
+  activeWorkout.exercises[ei].sets.splice(si, 1);
+  render();
+}
+
+// Afegim els botons d'eliminar a les pantalles existents
+const previousGymRoutines = gymRoutines;
+gymRoutines = function() {
+  let html = previousGymRoutines();
+  db.routines.forEach(r => {
+    const marker = `selectedRoutine='${r.id}';gymView='edit';render()">Editar</button>`;
+    html = html.replace(marker,
+      marker + `<button class="secondary dangerbtn" onclick="deleteRoutine('${r.id}')">Eliminar rutina</button>`);
+  });
+  return html;
+};
+
+const previousGymEditor = gymEditor;
+gymEditor = function() {
+  let html = previousGymEditor();
+  const r = routineById(selectedRoutine);
+  if (!r) return html;
+  r.exercises.forEach(e => {
+    e.sets.forEach((s, i) => {
+      const marker = `onchange="editRoutineSet('${e.id}',${i},'reps',this.value)"></div>`;
+      html = html.replace(marker,
+        marker + `<div class="full"><button class="secondary small dangerbtn" onclick="deleteRoutineSet('${e.id}',${i})">Eliminar sèrie ${i+1}</button></div>`);
+    });
+  });
+  return html;
+};
+
+const previousGymSession = gymSession;
+gymSession = function() {
+  let html = previousGymSession();
+  if (!activeWorkout) return html;
+  activeWorkout.exercises.forEach((e, ei) => {
+    e.sets.forEach((s, si) => {
+      const marker = `onchange="markWorkoutSet(${ei},${si},this.checked)">`;
+      html = html.replace(marker,
+        `<button class="secondary small dangerbtn" onclick="deleteWorkoutSet(${ei},${si})">Eliminar sèrie ${si+1}</button>` + marker);
+    });
+  });
+  return html;
+};
+
 </script></body></html>
