@@ -68,7 +68,7 @@ const normalize=v=>{let result={...empty(),...v};for(const k of Object.keys(empt
 const hasData=v=>Object.keys(empty()).some(k=>Array.isArray(v?.[k])&&v[k].length);
 let authenticated=false,ready=false,currentUser='',dataDirty=false,loadGeneration=0;
 const save=()=>{if(!authenticated||!ready)return;dataDirty=true;scheduleSync();};
-const DRAFT_KEY='mylife_v6_workout_draft';
+const DRAFT_KEY='mylife_v7_sandbox_workout_draft';
 const saveDraft=()=>{try{if(activeWorkout&&currentUser)localStorage.setItem(DRAFT_KEY,JSON.stringify({user:currentUser,workout:activeWorkout}));else localStorage.removeItem(DRAFT_KEY);}catch(e){}};
 const restoreDraft=()=>{try{let d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');activeWorkout=d?.user===currentUser?d.workout:null;}catch(e){activeWorkout=null;}};
 const menu=(title,items)=>`<div class="card"><h2>${title}</h2><div class="menu-grid">${items.map(x=>`<button type="button" class="menu-tile" data-view="${x[0]}"><span class="tile-icon">${x[1]}</span><strong>${x[2]}</strong><small>${x[3]}</small></button>`).join('')}</div></div>`;
@@ -232,5 +232,5 @@ function v7Wealth(){let hs=holdings(),value=hs.reduce((s,x)=>s+n(x.cost),0),cash
 function v7Privacy(){el().innerHTML='<div class="card"><h2>🔒 MY LIFE V7 · Entorn de proves</h2><p>Aquesta branca no inicia sessió a Supabase i no escriu cap dada al projecte real. Els registres d’aquesta prova només es desen al navegador d’aquest dispositiu.</p><button id="v7export">Exportar dades de proves</button></div>';document.getElementById('v7export').onclick=()=>{let a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify({v7,db},null,2)],{type:'application/json'}));a.href=url;a.download='my-life-v7-proves.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};}
 
 // Sandbox local: no es recupera ni s'envia cap dada a Supabase.
-cloud.access='';cloud.refresh='';cloud.url='';cloud.anon='';authenticated=true;ready=true;currentUser='v7-sandbox';db=normalize(JSON.parse(localStorage.getItem('mylife_v7_demo_db')||'{}'));scheduleSync=function(){localStorage.setItem('mylife_v7_demo_db',JSON.stringify(db));dataDirty=false;};document.getElementById('syncstatus').textContent='🧪 V7 · proves locals, sense Supabase';render();
+cloud.access='';cloud.refresh='';cloud.url='';cloud.anon='';authenticated=true;ready=true;currentUser='v7-sandbox';try{db=normalize(JSON.parse(localStorage.getItem('mylife_v7_demo_db')||'{}'));}catch(e){db=empty();}restoreDraft();scheduleSync=function(){localStorage.setItem('mylife_v7_demo_db',JSON.stringify(db));dataDirty=false;};document.getElementById('syncstatus').textContent='🧪 V7 · proves locals, sense Supabase';render();
 </script></body></html>
