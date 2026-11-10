@@ -65,6 +65,15 @@ body.v7-home .stats>.stat:nth-child(3):last-child {grid-column:1/-1;min-height:7
 body.v7-home .card button:not(.v7head) {max-width:100%;}
 body.v7-home #v7body-sport>button {margin-top:12px;}
 @media(max-width:390px){body.v7-home main>.card{padding:13px;}body.v7-home .v7head strong{font-size:15px;}body.v7-home .stat{padding:10px;}}
+
+/* V7: breathing room between card headings, content and actions */
+body.v7-home .v7head{margin-bottom:0;}
+body.v7-home [id^="v7body-"]:not(:empty){padding-top:16px;}
+body.v7-home #v7body-sport .stats{margin-top:2px;margin-bottom:18px;}
+body.v7-home #v7body-sport>button{display:inline-flex;align-items:center;justify-content:center;margin-top:4px;}
+body.v7-home #v7body-habits>button,
+body.v7-home #v7body-plans>button,
+body.v7-home #v7body-goals>button{margin-top:12px;}
 </style></head><body class="locked"><header><h1>MY LIFE <span class="pill">V7</span></h1><div class="sub" id="syncstatus">Dades desades en aquest dispositiu</div><button type="button" id="privacyShortcut" class="privacy-shortcut">🔒 Privacitat</button></header><nav id="nav"></nav><main id="app"></main><script>
 'use strict';
 const KEY='mylife_v3',CLOUD_KEY='mylife_v3_cloud'; // Mateixa clau: conserva les dades V3
