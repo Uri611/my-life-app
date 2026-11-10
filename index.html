@@ -258,6 +258,28 @@ function v7BankBalance(month){let base=n(v7.settings.bankOpening);return base+db
 function v7Wealth(){let hs=holdings(),value=hs.reduce((s,x)=>s+n(x.cost),0),cash=investmentCash(),last=[...v7.bankChecks].sort((a,b)=>b.month.localeCompare(a.month))[0],bank=last?n(last.actual):v7BankBalance(today().slice(0,7));el().innerHTML='<div class="card"><h2>🏦 Patrimoni</h2><p class="notice">Valor d’inversions provisional a cost d’adquisició, no cotització de mercat. Cal introduir valoracions reals per calcular el patrimoni exacte.</p><div class="stats"><div class="stat"><small>Banc · Targeta</small><strong>'+money(bank)+'</strong></div><div class="stat"><small>Trade Republic · efectiu</small><strong>'+money(cash)+'</strong></div><div class="stat"><small>Inversions · cost</small><strong>'+money(value)+'</strong></div><div class="stat"><small>Total provisional</small><strong>'+money(bank+cash+value)+'</strong></div></div></div><div class="card"><h3>Conciliació mensual</h3><form id="bankform"><div class="grid">'+field('Saldo inicial Targeta 01/01/2027 (€)','bankopening','number',v7.settings.bankOpening??'','step="0.01"')+field('Mes','bankmonth','month',today().slice(0,7),'required')+field('Saldo real al final del mes (€)','bankactual','number','','step="0.01" required')+'</div><button class="primary">Registrar comprovació</button></form>'+v7.bankChecks.map(x=>'<div class="item"><div><strong>'+esc(x.month)+'</strong><small>Real: '+money(x.actual)+' · Calculat: '+money(x.calculated)+' · Diferència: '+money(x.actual-x.calculated)+'</small></div><span class="pill">'+(Math.abs(x.actual-x.calculated)<0.005?'Quadrat':'Revisar')+'</span></div>').join('')+'</div>';document.getElementById('bankform').onsubmit=e=>{e.preventDefault();if(val('bankopening')!=='')v7.settings.bankOpening=n(val('bankopening'));let month=val('bankmonth');v7.bankChecks=v7.bankChecks.filter(x=>x.month!==month);v7.bankChecks.push({id:id(),month,actual:n(val('bankactual')),calculated:v7BankBalance(month)});v7Save();v7Wealth();};}
 function v7Privacy(){el().innerHTML='<div class="card"><h2>🔒 MY LIFE V7 · Entorn de proves</h2><p>Aquesta branca no inicia sessió a Supabase i no escriu cap dada al projecte real. Els registres d’aquesta prova només es desen al navegador d’aquest dispositiu.</p><button id="v7export">Exportar dades de proves</button></div>';document.getElementById('v7export').onclick=()=>{let a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify({v7,db},null,2)],{type:'application/json'}));a.href=url;a.download='my-life-v7-proves.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};}
 
+
+/* PWA: show the deployed build to help diagnose cached home-screen icons. */
+const MYLIFE_BUILD='2026-11-10-v7-spacing-3';
+async function mylifeCheckUpdate(){
+  if(document.visibilityState!=='visible'||activeWorkout||!authenticated||!ready)return;
+  try{
+    const res=await fetch('./version.json?check='+Date.now(),{cache:'no-store'});
+    if(!res.ok)return;
+    const data=await res.json();
+    if(data.build&&data.build!==MYLIFE_BUILD){
+      const key='mylife_last_reload_'+data.build;
+      if(sessionStorage.getItem(key))return;
+      sessionStorage.setItem(key,'1');
+      const next=new URL(location.href);
+      next.searchParams.set('v',data.build);
+      location.replace(next.href);
+    }
+  }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')mylifeCheckUpdate();});
+window.addEventListener('pageshow',()=>{setTimeout(mylifeCheckUpdate,1000);});
+
 // Producció: conserva la sessió i el payload originals de Supabase.
 showGate('Comprovant la sessió desada...');
 if(cloud.refresh&&cloud.url&&cloud.anon)openAccount();else showGate();
